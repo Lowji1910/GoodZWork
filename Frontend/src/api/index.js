@@ -73,7 +73,10 @@ export const userAPI = {
         api.get('/api/users/list', { params: { status, role } }),
 
     getUser: (userId) =>
-        api.get(`/api/users/${userId}`)
+        api.get(`/api/users/${userId}`),
+
+    searchUsers: (query, department) =>
+        api.get('/api/users/search', { params: { q: query, department } })
 }
 
 // ============ ATTENDANCE APIs ============
