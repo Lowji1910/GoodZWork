@@ -21,6 +21,7 @@ class UserStatus(str, Enum):
     ACTIVE = "ACTIVE"       # Approved, full access
     SUSPENDED = "SUSPENDED" # Temporarily suspended
     INACTIVE = "INACTIVE"   # Account disabled
+    TERMINATED = "TERMINATED"  # Fired/resigned
 
 class UserRole(str, Enum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -37,6 +38,10 @@ class UserBase(BaseModel):
     department: Optional[str] = None
     position: Optional[str] = None
     avatar: Optional[str] = None
+    employee_id: Optional[str] = None  # Auto-generated: DEPT-XXX
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_holder: Optional[str] = None
     role: UserRole = UserRole.EMPLOYEE
     status: UserStatus = UserStatus.INIT
     
@@ -66,6 +71,9 @@ class UserProfileUpdate(BaseModel):
     department: Optional[str] = None
     position: Optional[str] = None
     avatar: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_holder: Optional[str] = None
 
 # Login Request
 class UserLogin(BaseModel):
@@ -81,6 +89,10 @@ class UserResponse(BaseModel):
     department: Optional[str] = None
     position: Optional[str] = None
     avatar: Optional[str] = None
+    employee_id: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_holder: Optional[str] = None
     role: str  # Changed to str for MongoDB compatibility
     status: str  # Changed to str for MongoDB compatibility
     face_registered: bool = False

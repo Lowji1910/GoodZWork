@@ -178,6 +178,109 @@ async def update_project_status(
     
     return {"message": f"Đã cập nhật trạng thái: {status.value}"}
 
+# ============ MEMBER MANAGEMENT ============
+
+from pydantic import BaseModel as PydanticModel
+from typing import List as TypeList
+
+class MemberIds(PydanticModel):
+    member_ids: TypeList[str]
+
+@router.get("/{project_id}/members", response_model=list)
+async def get_project_members(
+    project_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all members of a project"""
+    projects_col = get_projects_collection()
+    users_col = get_users_collection()
+    
+    project = await projects_col.find_one({"_id": ObjectId(project_id)})
+    if not project:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án")
+    
+    members = []
+    for member_id in project.get("team_members", []):
+        try:
+            user = await users_col.find_one({"_id": ObjectId(member_id)})
+            if user:
+                members.append({
+                    "id": str(user["_id"]),
+                    "full_name": user.get("full_name"),
+                    "email": user.get("email"),
+                    "avatar": user.get("avatar"),
+                    "position": user.get("position"),
+                    "department": user.get("department")
+                })
+        except:
+            pass
+    
+    return members
+
+@router.post("/{project_id}/members")
+async def add_project_members(
+    project_id: str,
+    data: MemberIds,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add members to project"""
+    if current_user.get("role") not in [UserRole.LEADER.value, UserRole.HR_MANAGER.value, UserRole.SUPER_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Không có quyền thêm thành viên")
+    
+    projects_col = get_projects_collection()
+    
+    await projects_col.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$addToSet": {"team_members": {"$each": data.member_ids}},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    return {"message": f"Đã thêm {len(data.member_ids)} thành viên"}
+
+@router.delete("/{project_id}/members/{member_id}")
+async def remove_project_member(
+    project_id: str,
+    member_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove member from project"""
+    if current_user.get("role") not in [UserRole.LEADER.value, UserRole.HR_MANAGER.value, UserRole.SUPER_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Không có quyền xóa thành viên")
+    
+    projects_col = get_projects_collection()
+    
+    await projects_col.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$pull": {"team_members": member_id},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    return {"message": "Đã xóa thành viên khỏi dự án"}
+
+@router.delete("/{project_id}")
+async def delete_project(
+    project_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a project (Admin only)"""
+    if current_user.get("role") not in [UserRole.HR_MANAGER.value, UserRole.SUPER_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Không có quyền xóa dự án")
+    
+    projects_col = get_projects_collection()
+    tasks_col = get_tasks_collection()
+    
+    # Delete all tasks in project
+    await tasks_col.delete_many({"project_id": project_id})
+    
+    # Delete project
+    await projects_col.delete_one({"_id": ObjectId(project_id)})
+    
+    return {"message": "Đã xóa dự án"}
+
 # ============ TASK ENDPOINTS ============
 
 @router.get("/{project_id}/tasks", response_model=List[dict])
@@ -300,6 +403,127 @@ async def get_my_tasks(
         })
     
     return result
+
+@router.get("/tasks/{task_id}")
+async def get_task(
+    task_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get single task details"""
+    tasks_col = get_tasks_collection()
+    users_col = get_users_collection()
+    projects_col = get_projects_collection()
+    
+    task = await tasks_col.find_one({"_id": ObjectId(task_id)})
+    if not task:
+        raise HTTPException(status_code=404, detail="Không tìm thấy task")
+    
+    # Get assignee info
+    assignee = None
+    if task.get("assigned_to"):
+        try:
+            user = await users_col.find_one({"_id": ObjectId(task["assigned_to"])})
+            if user:
+                assignee = {
+                    "id": str(user["_id"]),
+                    "full_name": user.get("full_name"),
+                    "avatar": user.get("avatar")
+                }
+        except:
+            pass
+    
+    # Get project info
+    project = await projects_col.find_one({"_id": ObjectId(task["project_id"])})
+    
+    return {
+        "id": str(task["_id"]),
+        "title": task["title"],
+        "description": task.get("description"),
+        "priority": task.get("priority"),
+        "status": task.get("status"),
+        "deadline": task.get("deadline"),
+        "estimated_hours": task.get("estimated_hours"),
+        "progress": task.get("progress", 0),
+        "assigned_to": assignee,
+        "assigned_by": task.get("assigned_by"),
+        "rejection_reason": task.get("rejection_reason"),
+        "project_id": task["project_id"],
+        "project_name": project.get("name") if project else "Unknown",
+        "created_at": task.get("created_at"),
+        "updated_at": task.get("updated_at"),
+        "completed_at": task.get("completed_at")
+    }
+
+class TaskUpdate(PydanticModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    deadline: Optional[datetime] = None
+    estimated_hours: Optional[float] = None
+    assigned_to: Optional[str] = None
+    status: Optional[str] = None
+
+@router.put("/tasks/{task_id}")
+async def update_task(
+    task_id: str,
+    data: TaskUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update task (Leader/Admin only)"""
+    if current_user.get("role") not in [UserRole.LEADER.value, UserRole.HR_MANAGER.value, UserRole.SUPER_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Không có quyền sửa task")
+    
+    tasks_col = get_tasks_collection()
+    
+    # Build update document
+    update_doc = {"updated_at": datetime.utcnow()}
+    if data.title is not None:
+        update_doc["title"] = data.title
+    if data.description is not None:
+        update_doc["description"] = data.description
+    if data.priority is not None:
+        update_doc["priority"] = data.priority
+    if data.deadline is not None:
+        update_doc["deadline"] = data.deadline
+    if data.estimated_hours is not None:
+        update_doc["estimated_hours"] = data.estimated_hours
+    if data.status is not None:
+        update_doc["status"] = data.status
+        if data.status == "COMPLETED":
+            update_doc["completed_at"] = datetime.utcnow()
+            update_doc["progress"] = 100
+    
+    # Handle reassignment
+    if data.assigned_to is not None:
+        update_doc["assigned_to"] = data.assigned_to
+        # If reassigning, set status to ASSIGNED
+        if data.status is None:
+            update_doc["status"] = TaskStatus.ASSIGNED.value
+    
+    await tasks_col.update_one(
+        {"_id": ObjectId(task_id)},
+        {"$set": update_doc}
+    )
+    
+    return {"message": "Cập nhật task thành công"}
+
+@router.delete("/tasks/{task_id}")
+async def delete_task(
+    task_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a task (Leader/Admin only)"""
+    if current_user.get("role") not in [UserRole.LEADER.value, UserRole.HR_MANAGER.value, UserRole.SUPER_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Không có quyền xóa task")
+    
+    tasks_col = get_tasks_collection()
+    
+    result = await tasks_col.delete_one({"_id": ObjectId(task_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Không tìm thấy task")
+    
+    return {"message": "Đã xóa task"}
 
 @router.put("/tasks/{task_id}/accept")
 async def respond_to_task(

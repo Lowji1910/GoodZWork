@@ -106,8 +106,8 @@ async def check_in(
     
     # 3. Check if already checked in today
     attendance_col = get_attendance_collection()
-    today_start = datetime.combine(datetime.today(), time.min)
-    today_end = datetime.combine(datetime.today(), time.max)
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
     
     existing_checkin = await attendance_col.find_one({
         "user_id": current_user["_id"],
@@ -192,8 +192,9 @@ async def check_out(
     
     # 3. Check if checked in today
     attendance_col = get_attendance_collection()
-    today_start = datetime.combine(datetime.today(), time.min)
-    today_end = datetime.combine(datetime.today(), time.max)
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
+    print(f"DEBUG: Check-out search range: {today_start} - {today_end}")
     
     existing_checkin = await attendance_col.find_one({
         "user_id": current_user["_id"],
@@ -202,6 +203,13 @@ async def check_out(
     })
     
     if not existing_checkin:
+        print(f"Checkout ERROR: No checkin found. User: {current_user['_id']}, Range: {today_start} - {today_end}")
+        # Debug: Print recent logs
+        recent_logs = await attendance_col.find({"user_id": current_user["_id"]}).sort("timestamp", -1).limit(5).to_list(5)
+        print("DEBUG: Recent logs:")
+        for log in recent_logs:
+            print(f" - {log.get('attendance_type')} at {log.get('timestamp')}")
+            
         raise HTTPException(status_code=400, detail="Bạn chưa check-in hôm nay")
     
     # 4. Check if already checked out
@@ -297,8 +305,8 @@ async def get_today_status(current_user: dict = Depends(get_current_user)):
     """Get today's attendance status for current user"""
     attendance_col = get_attendance_collection()
     
-    today_start = datetime.combine(datetime.today(), time.min)
-    today_end = datetime.combine(datetime.today(), time.max)
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
     
     checkin = await attendance_col.find_one({
         "user_id": current_user["_id"],
@@ -325,3 +333,123 @@ async def get_today_status(current_user: dict = Depends(get_current_user)):
 async def get_company_location():
     """Get company location for geofencing"""
     return await geofencing_service.get_company_location()
+
+@router.get("/report/monthly")
+async def get_monthly_report(
+    month: int,
+    year: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get monthly attendance report for current user"""
+    from calendar import monthrange
+    
+    attendance_col = get_attendance_collection()
+    
+    # Build date range
+    first_day = datetime(year, month, 1)
+    last_day = datetime(year, month, monthrange(year, month)[1], 23, 59, 59)
+    
+    query = {
+        "user_id": current_user["_id"],
+        "timestamp": {"$gte": first_day, "$lte": last_day}
+    }
+    
+    logs = await attendance_col.find(query).sort("timestamp", 1).to_list(1000)
+    
+    # Aggregate by day
+    daily_data = {}
+    for log in logs:
+        day = log["timestamp"].strftime("%Y-%m-%d")
+        if day not in daily_data:
+            daily_data[day] = {"checkin": None, "checkout": None, "status": None}
+        
+        if log["attendance_type"] == "CHECK_IN":
+            daily_data[day]["checkin"] = log["timestamp"].strftime("%H:%M")
+            daily_data[day]["status"] = log["status"]
+        elif log["attendance_type"] == "CHECK_OUT":
+            daily_data[day]["checkout"] = log["timestamp"].strftime("%H:%M")
+    
+    # Calculate statistics
+    total_days = len(daily_data)
+    on_time = sum(1 for d in daily_data.values() if d["status"] == "ON_TIME")
+    late = sum(1 for d in daily_data.values() if d["status"] == "LATE")
+    
+    return {
+        "month": month,
+        "year": year,
+        "total_working_days": total_days,
+        "on_time_days": on_time,
+        "late_days": late,
+        "on_time_rate": round(on_time / total_days * 100, 1) if total_days > 0 else 0,
+        "daily_data": daily_data
+    }
+
+@router.get("/report/team")
+async def get_team_report(
+    month: int,
+    year: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get team attendance report (for Leaders/HR)"""
+    from ..models.user import UserRole
+    from calendar import monthrange
+    
+    if current_user.get("role") not in [UserRole.SUPER_ADMIN.value, UserRole.HR_MANAGER.value, UserRole.LEADER.value]:
+        raise HTTPException(status_code=403, detail="Không có quyền xem báo cáo team")
+    
+    attendance_col = get_attendance_collection()
+    users_col = get_users_collection()
+    
+    # Build date range
+    first_day = datetime(year, month, 1)
+    last_day = datetime(year, month, monthrange(year, month)[1], 23, 59, 59)
+    
+    # Get all users (filter by department for Leaders)
+    user_query = {"status": "ACTIVE"}
+    if current_user.get("role") == UserRole.LEADER.value:
+        user_query["department"] = current_user.get("department")
+    
+    users = await users_col.find(user_query).to_list(1000)
+    
+    # Get all attendance logs for the month
+    logs = await attendance_col.find({
+        "timestamp": {"$gte": first_day, "$lte": last_day},
+        "attendance_type": "CHECK_IN"
+    }).to_list(10000)
+    
+    # Aggregate by user
+    user_stats = {}
+    for user in users:
+        user_id = str(user["_id"])
+        user_logs = [l for l in logs if l["user_id"] == user_id]
+        
+        on_time = sum(1 for l in user_logs if l["status"] == "ON_TIME")
+        late = sum(1 for l in user_logs if l["status"] == "LATE")
+        total = len(user_logs)
+        
+        user_stats[user_id] = {
+            "id": user_id,
+            "name": user.get("full_name"),
+            "department": user.get("department"),
+            "total_days": total,
+            "on_time": on_time,
+            "late": late,
+            "on_time_rate": round(on_time / total * 100, 1) if total > 0 else 0
+        }
+    
+    # Sort by on_time_rate descending
+    sorted_stats = sorted(user_stats.values(), key=lambda x: x["on_time_rate"], reverse=True)
+    
+    # Calculate overall statistics
+    total_checkins = len(logs)
+    total_on_time = sum(1 for l in logs if l["status"] == "ON_TIME")
+    
+    return {
+        "month": month,
+        "year": year,
+        "total_employees": len(users),
+        "total_checkins": total_checkins,
+        "overall_on_time_rate": round(total_on_time / total_checkins * 100, 1) if total_checkins > 0 else 0,
+        "employees": sorted_stats
+    }
+

@@ -9,13 +9,13 @@ db = Database()
 async def connect_to_mongo():
     """Connect to MongoDB on startup"""
     db.client = AsyncIOMotorClient(settings.MONGODB_URL)
-    print(f"✅ Connected to MongoDB: {settings.DATABASE_NAME}")
+    print(f"✅ Đã kết nối tới MongoDB: {settings.DATABASE_NAME}")
 
 async def close_mongo_connection():
     """Close MongoDB connection on shutdown"""
     if db.client:
         db.client.close()
-        print("❌ Disconnected from MongoDB")
+        print("❌ Đã ngắt kết nối MongoDB")
 
 def get_database():
     """Get the database instance"""

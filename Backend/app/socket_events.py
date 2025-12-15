@@ -76,11 +76,27 @@ async def send_message(sid, data):
     message_type = data.get("message_type", "text")
     file_url = data.get("file_url")
     file_name = data.get("file_name")
+    reply_to_id = data.get("reply_to_id")
     
-    if not conversation_id or not sender_id or not content:
+    if not conversation_id or not sender_id:
         await sio.emit("error", {"message": "Missing required fields"}, to=sid)
         return
     
+    # Handle Reply
+    reply_to = None
+    if reply_to_id:
+        try:
+            original = await msg_col.find_one({"_id": ObjectId(reply_to_id)})
+            if original:
+                reply_to = {
+                    "id": str(original["_id"]),
+                    "content": original.get("content"),
+                    "sender_name": original.get("sender_name"),
+                    "message_type": original.get("message_type")
+                }
+        except Exception as e:
+            print(f"Error fetching reply message: {e}")
+
     # Create message
     message = {
         "conversation_id": conversation_id,
@@ -91,6 +107,7 @@ async def send_message(sid, data):
         "message_type": message_type,
         "file_url": file_url,
         "file_name": file_name,
+        "reply_to": reply_to,
         "status": MessageStatus.SENT.value,
         "is_revoked": False,
         "seen_by": [],

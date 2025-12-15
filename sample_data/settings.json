@@ -1,0 +1,46 @@
+[
+    {
+        "key": "company_info",
+        "value": {
+            "name": "GoodZ Company",
+            "address": "123 Nguyen Hue, Quan 1, TP.HCM",
+            "phone": "028 1234 5678",
+            "email": "contact@goodzwork.com"
+        }
+    },
+    {
+        "key": "working_hours",
+        "value": {
+            "start_time": "08:00",
+            "end_time": "17:30",
+            "late_threshold_minutes": 15,
+            "working_days": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday"
+            ]
+        }
+    },
+    {
+        "key": "leave_policy",
+        "value": {
+            "annual_leave_days": 12,
+            "sick_leave_days": 30,
+            "maternity_leave_days": 180,
+            "paternity_leave_days": 5
+        }
+    },
+    {
+        "key": "payroll",
+        "value": {
+            "base_currency": "VND",
+            "payment_date": 5,
+            "social_insurance_rate": 0.08,
+            "health_insurance_rate": 0.015,
+            "unemployment_insurance_rate": 0.01,
+            "personal_income_tax_threshold": 11000000
+        }
+    }
+]

@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAuth } from '../context/AuthContext'
-import { attendanceAPI, projectAPI } from '../api'
+import { attendanceAPI, projectAPI, leaveAPI } from '../api'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
 export default function DashboardPage() {
+    const navigate = useNavigate()
     const { user, hasRole } = useAuth()
     const [todayStatus, setTodayStatus] = useState(null)
     const [performance, setPerformance] = useState([])
+    const [pendingLeaves, setPendingLeaves] = useState(0)
+    const [leaveSummary, setLeaveSummary] = useState({ remaining: 0 })
     const [loading, setLoading] = useState(true)
+
+    const isManager = hasRole(['SUPER_ADMIN', 'HR_MANAGER', 'LEADER'])
 
     useEffect(() => {
         loadDashboardData()
@@ -21,10 +27,24 @@ export default function DashboardPage() {
             const attendanceRes = await attendanceAPI.getTodayStatus()
             setTodayStatus(attendanceRes.data)
 
-            // Load employee performance (for leaders/admins)
-            if (hasRole(['SUPER_ADMIN', 'HR_MANAGER', 'LEADER'])) {
-                const perfRes = await projectAPI.getEmployeePerformance()
-                setPerformance(perfRes.data)
+            // Load leave summary
+            try {
+                const leaveRes = await leaveAPI.getMyLeaves()
+                setLeaveSummary(leaveRes.data.summary)
+            } catch (e) { }
+
+            // Load pending leaves count (for managers)
+            if (isManager) {
+                try {
+                    const pendingRes = await leaveAPI.getPendingLeaves()
+                    setPendingLeaves(pendingRes.data.length)
+                } catch (e) { }
+
+                // Load employee performance
+                try {
+                    const perfRes = await projectAPI.getEmployeePerformance()
+                    setPerformance(perfRes.data || [])
+                } catch (e) { }
             }
         } catch (error) {
             console.error('Failed to load dashboard data:', error)
@@ -50,86 +70,105 @@ export default function DashboardPage() {
     ]
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="spinner"></div>
-            </div>
-        )
+        return <div className="flex items-center justify-center h-64"><div className="spinner"></div></div>
     }
 
     return (
         <div className="space-y-6">
             {/* Welcome Header */}
             <div className="glass-card p-6">
-                <h1 className="text-2xl font-bold mb-2">
-                    Xin chào, {user?.full_name || 'Bạn'}! 👋
-                </h1>
-                <p className="text-slate-400">
-                    {format(new Date(), "EEEE, 'ngày' dd 'tháng' MM, yyyy", { locale: vi })}
-                </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800 mb-1">
+                            Xin chào, {user?.full_name || 'Bạn'}! 👋
+                        </h1>
+                        <p className="text-slate-500">
+                            {format(new Date(), "EEEE, 'ngày' dd 'tháng' MM, yyyy", { locale: vi })}
+                        </p>
+                    </div>
+                    {/* Quick Actions */}
+                    <div className="flex gap-2">
+                        <button onClick={() => navigate('/attendance')} className="btn-primary text-sm">
+                            ⏰ Chấm công
+                        </button>
+                        <button onClick={() => navigate('/leaves')} className="btn-secondary text-sm">
+                            🏖️ Xin nghỉ
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Today Status */}
-                <div className="glass-card p-6 card-hover">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="glass-card p-5 card-hover cursor-pointer" onClick={() => navigate('/attendance')}>
+                    <div className="flex items-center justify-between mb-3">
                         <span className="text-3xl">⏰</span>
-                        <span className={`px-3 py-1 rounded-full text-sm ${todayStatus?.checked_in ? 'status-active' : 'status-pending'
-                            }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs ${todayStatus?.checked_in ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                             {todayStatus?.checked_in ? 'Đã chấm công' : 'Chưa chấm công'}
                         </span>
                     </div>
-                    <h3 className="text-lg font-semibold">Chấm công hôm nay</h3>
+                    <h3 className="text-base font-semibold text-slate-700">Chấm công hôm nay</h3>
                     {todayStatus?.checkin_time && (
-                        <p className="text-slate-400 text-sm mt-1">
-                            Check-in: {format(new Date(todayStatus.checkin_time), 'HH:mm')}
-                        </p>
-                    )}
-                    {todayStatus?.checkout_time && (
-                        <p className="text-slate-400 text-sm">
-                            Check-out: {format(new Date(todayStatus.checkout_time), 'HH:mm')}
+                        <p className="text-slate-500 text-sm mt-1">
+                            In: {format(new Date(todayStatus.checkin_time), 'HH:mm')}
+                            {todayStatus?.checkout_time && ` → Out: ${format(new Date(todayStatus.checkout_time), 'HH:mm')}`}
                         </p>
                     )}
                 </div>
 
-                {/* Tasks */}
-                <div className="glass-card p-6 card-hover">
-                    <div className="flex items-center justify-between mb-4">
+                {/* Leave Balance */}
+                <div className="glass-card p-5 card-hover cursor-pointer" onClick={() => navigate('/leaves')}>
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">🏖️</span>
+                        <span className="text-2xl font-bold text-blue-600">{leaveSummary.remaining}</span>
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-700">Ngày phép còn lại</h3>
+                    <p className="text-slate-500 text-sm mt-1">Đã dùng: {leaveSummary.total_used || 0}/{leaveSummary.annual_quota || 12} ngày</p>
+                </div>
+
+                {/* Tasks Widget */}
+                <div className="glass-card p-5 card-hover cursor-pointer" onClick={() => navigate('/tasks')}>
+                    <div className="flex items-center justify-between mb-3">
                         <span className="text-3xl">✅</span>
-                        <span className="text-2xl font-bold text-blue-400">5</span>
+                        <span className="text-2xl font-bold text-purple-600">—</span>
                     </div>
-                    <h3 className="text-lg font-semibold">Công việc đang làm</h3>
-                    <p className="text-slate-400 text-sm mt-1">2 việc cần hoàn thành hôm nay</p>
+                    <h3 className="text-base font-semibold text-slate-700">Công việc của tôi</h3>
+                    <p className="text-slate-500 text-sm mt-1">Xem danh sách tasks</p>
                 </div>
 
-                {/* Messages */}
-                <div className="glass-card p-6 card-hover">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-3xl">💬</span>
-                        <span className="text-2xl font-bold text-green-400">3</span>
+                {/* HR Widget - Pending Leaves */}
+                {isManager ? (
+                    <div className="glass-card p-5 card-hover cursor-pointer" onClick={() => navigate('/leaves')}>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-3xl">📋</span>
+                            <span className={`text-2xl font-bold ${pendingLeaves > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {pendingLeaves}
+                            </span>
+                        </div>
+                        <h3 className="text-base font-semibold text-slate-700">Đơn chờ duyệt</h3>
+                        <p className="text-slate-500 text-sm mt-1">
+                            {pendingLeaves > 0 ? 'Cần xem xét ngay' : 'Không có đơn mới'}
+                        </p>
                     </div>
-                    <h3 className="text-lg font-semibold">Tin nhắn chưa đọc</h3>
-                    <p className="text-slate-400 text-sm mt-1">Từ 2 cuộc trò chuyện</p>
-                </div>
-
-                {/* Projects */}
-                <div className="glass-card p-6 card-hover">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-3xl">📁</span>
-                        <span className="text-2xl font-bold text-purple-400">2</span>
+                ) : (
+                    <div className="glass-card p-5 card-hover cursor-pointer" onClick={() => navigate('/projects')}>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-3xl">📁</span>
+                            <span className="text-2xl font-bold text-orange-600">—</span>
+                        </div>
+                        <h3 className="text-base font-semibold text-slate-700">Dự án</h3>
+                        <p className="text-slate-500 text-sm mt-1">Xem các dự án</p>
                     </div>
-                    <h3 className="text-lg font-semibold">Dự án đang tham gia</h3>
-                    <p className="text-slate-400 text-sm mt-1">1 dự án sắp đến deadline</p>
-                </div>
+                )}
             </div>
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Attendance Pie Chart */}
                 <div className="glass-card p-6">
-                    <h3 className="text-lg font-semibold mb-4">📊 Tỷ lệ chấm công hôm nay</h3>
-                    <ResponsiveContainer width="100%" height={300}>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-4">📊 Tỷ lệ chấm công tháng này</h3>
+                    <ResponsiveContainer width="100%" height={280}>
                         <PieChart>
                             <Pie
                                 data={attendanceData}
@@ -152,16 +191,16 @@ export default function DashboardPage() {
 
                 {/* Monthly Bar Chart */}
                 <div className="glass-card p-6">
-                    <h3 className="text-lg font-semibold mb-4">📈 Thống kê chấm công theo tháng</h3>
-                    <ResponsiveContainer width="100%" height={300}>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-4">📈 Thống kê chấm công theo tháng</h3>
+                    <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={monthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                            <XAxis dataKey="month" stroke="#94a3b8" />
-                            <YAxis stroke="#94a3b8" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="month" stroke="#64748b" />
+                            <YAxis stroke="#64748b" />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#1e293b',
-                                    border: '1px solid #334155',
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid #e2e8f0',
                                     borderRadius: '8px'
                                 }}
                             />
@@ -175,41 +214,41 @@ export default function DashboardPage() {
             </div>
 
             {/* Employee Performance (Leaders/Admins only) */}
-            {hasRole(['SUPER_ADMIN', 'HR_MANAGER', 'LEADER']) && performance.length > 0 && (
+            {isManager && performance.length > 0 && (
                 <div className="glass-card p-6">
-                    <h3 className="text-lg font-semibold mb-4">👥 Hiệu suất nhân viên</h3>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-4">👥 Hiệu suất nhân viên</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="border-b border-slate-700">
-                                    <th className="text-left py-3 px-4">Nhân viên</th>
-                                    <th className="text-center py-3 px-4">Tổng task</th>
-                                    <th className="text-center py-3 px-4">Hoàn thành</th>
-                                    <th className="text-center py-3 px-4">Đang làm</th>
-                                    <th className="text-center py-3 px-4">Tỷ lệ</th>
+                                <tr className="bg-slate-100">
+                                    <th className="text-left py-3 px-4 text-slate-700 font-semibold">Nhân viên</th>
+                                    <th className="text-center py-3 px-4 text-slate-700 font-semibold">Tổng task</th>
+                                    <th className="text-center py-3 px-4 text-slate-700 font-semibold">Hoàn thành</th>
+                                    <th className="text-center py-3 px-4 text-slate-700 font-semibold">Đang làm</th>
+                                    <th className="text-center py-3 px-4 text-slate-700 font-semibold">Tỷ lệ</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {performance.slice(0, 5).map((emp) => (
-                                    <tr key={emp.user_id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                                    <tr key={emp.user_id} className="border-t border-slate-200 hover:bg-slate-50">
                                         <td className="py-3 px-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold">
                                                     {emp.full_name?.[0] || '?'}
                                                 </div>
                                                 <div>
-                                                    <p className="font-medium">{emp.full_name}</p>
-                                                    <p className="text-xs text-slate-400">{emp.department}</p>
+                                                    <p className="font-medium text-slate-800">{emp.full_name}</p>
+                                                    <p className="text-xs text-slate-500">{emp.department}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="text-center py-3 px-4">{emp.total_tasks}</td>
-                                        <td className="text-center py-3 px-4 text-green-400">{emp.completed_tasks}</td>
-                                        <td className="text-center py-3 px-4 text-blue-400">{emp.in_progress_tasks}</td>
+                                        <td className="text-center py-3 px-4 text-slate-700">{emp.total_tasks}</td>
+                                        <td className="text-center py-3 px-4 text-green-600 font-medium">{emp.completed_tasks}</td>
+                                        <td className="text-center py-3 px-4 text-blue-600">{emp.in_progress_tasks}</td>
                                         <td className="text-center py-3 px-4">
-                                            <span className={`px-2 py-1 rounded-full text-sm ${emp.completion_rate >= 80 ? 'bg-green-500/20 text-green-400' :
-                                                    emp.completion_rate >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                        'bg-red-500/20 text-red-400'
+                                            <span className={`px-2 py-1 rounded-full text-xs ${emp.completion_rate >= 80 ? 'bg-green-100 text-green-700' :
+                                                emp.completion_rate >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-red-100 text-red-700'
                                                 }`}>
                                                 {emp.completion_rate}%
                                             </span>

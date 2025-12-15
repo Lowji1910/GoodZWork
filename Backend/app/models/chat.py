@@ -50,10 +50,11 @@ class Message(BaseModel):
     message_type: str = "text"  # text, image, file
     file_url: Optional[str] = None
     file_name: Optional[str] = None
+    reply_to: Optional[dict] = None  # {id, content, sender_name, message_type}
     status: MessageStatus = MessageStatus.SENDING
     is_revoked: bool = False
-    seen_by: List[str] = []  # List of user IDs who have seen
-    delivered_to: List[str] = []  # List of user IDs who received
+    seen_by: List[str] = []
+    delivered_to: List[str] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:
@@ -65,6 +66,7 @@ class MessageCreate(BaseModel):
     message_type: str = "text"
     file_url: Optional[str] = None
     file_name: Optional[str] = None
+    reply_to_id: Optional[str] = None
 
 class MessageRevoke(BaseModel):
     message_id: str

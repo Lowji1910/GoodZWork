@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { projectAPI } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
 
 export default function ProjectsPage() {
+    const navigate = useNavigate()
     const { hasRole } = useAuth()
     const [projects, setProjects] = useState([])
     const [filter, setFilter] = useState('all')
@@ -104,7 +106,11 @@ export default function ProjectsPage() {
                     </div>
                 ) : (
                     projects.map(project => (
-                        <div key={project.id} className="glass-card p-6 card-hover">
+                        <div
+                            key={project.id}
+                            className="glass-card p-6 card-hover cursor-pointer"
+                            onClick={() => navigate(`/projects/${project.id}`)}
+                        >
                             <div className="flex items-start justify-between mb-4">
                                 <h3 className="text-lg font-semibold">{project.name}</h3>
                                 <span className={`text-xs px-2 py-1 rounded-full border ${getStatusColor(project.status)}`}>

@@ -21,6 +21,14 @@ import AdminUsersPage from './pages/AdminUsersPage'
 import AdminPendingPage from './pages/AdminPendingPage'
 import AdminFaceEnrollPage from './pages/AdminFaceEnrollPage'
 import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
+import ProjectDetailPage from './pages/ProjectDetailPage'
+import LeavesPage from './pages/LeavesPage'
+import ReportsPage from './pages/ReportsPage'
+import CalendarPage from './pages/CalendarPage'
+import OvertimePage from './pages/OvertimePage'
+import KPIPage from './pages/KPIPage'
+import ContractsPage from './pages/ContractsPage'
 
 // Layout with Sidebar
 function MainLayout({ children }) {
@@ -115,6 +123,14 @@ export default function App() {
                 }
             />
             <Route
+                path="/projects/:projectId"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><ProjectDetailPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
                 path="/tasks"
                 element={
                     <ProtectedRoute>
@@ -123,10 +139,66 @@ export default function App() {
                 }
             />
             <Route
+                path="/leaves"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><LeavesPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/reports"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><ReportsPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/calendar"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><CalendarPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/overtime"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><OvertimePage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/kpi"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><KPIPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/contracts"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><ContractsPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
                 path="/payroll"
                 element={
                     <ProtectedRoute>
                         <MainLayout><PayrollPage /></MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/profile"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout><ProfilePage /></MainLayout>
                     </ProtectedRoute>
                 }
             />

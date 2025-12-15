@@ -1,0 +1,88 @@
+[
+    {
+        "email": "admin@goodzwork.com",
+        "password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4LG3z7yK8gC1Q0Hy",
+        "full_name": "Admin System",
+        "role": "SUPER_ADMIN",
+        "status": "ACTIVE",
+        "department": "IT",
+        "position": "System Administrator",
+        "employee_id": "EMP001",
+        "phone": "0901234567",
+        "date_of_birth": "1990-01-15",
+        "address": "123 Nguyen Hue, Q1, HCM",
+        "annual_leave_days": 12,
+        "remaining_leave_days": 12,
+        "created_at": {
+            "$date": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "email": "hr@goodzwork.com",
+        "password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4LG3z7yK8gC1Q0Hy",
+        "full_name": "Nguyen HR Manager",
+        "role": "HR_MANAGER",
+        "status": "ACTIVE",
+        "department": "Human Resources",
+        "position": "HR Manager",
+        "employee_id": "EMP002",
+        "phone": "0902345678",
+        "date_of_birth": "1988-05-20",
+        "annual_leave_days": 12,
+        "remaining_leave_days": 10,
+        "created_at": {
+            "$date": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "email": "leader@goodzwork.com",
+        "password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4LG3z7yK8gC1Q0Hy",
+        "full_name": "Tran Team Leader",
+        "role": "LEADER",
+        "status": "ACTIVE",
+        "department": "Development",
+        "position": "Tech Lead",
+        "employee_id": "EMP003",
+        "phone": "0903456789",
+        "date_of_birth": "1992-08-10",
+        "annual_leave_days": 12,
+        "remaining_leave_days": 8,
+        "created_at": {
+            "$date": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "email": "employee@goodzwork.com",
+        "password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4LG3z7yK8gC1Q0Hy",
+        "full_name": "Le Van Employee",
+        "role": "EMPLOYEE",
+        "status": "ACTIVE",
+        "department": "Development",
+        "position": "Software Developer",
+        "employee_id": "EMP004",
+        "phone": "0904567890",
+        "date_of_birth": "1995-12-25",
+        "annual_leave_days": 12,
+        "remaining_leave_days": 12,
+        "created_at": {
+            "$date": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "email": "accountant@goodzwork.com",
+        "password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4LG3z7yK8gC1Q0Hy",
+        "full_name": "Pham Ke Toan",
+        "role": "ACCOUNTANT",
+        "status": "ACTIVE",
+        "department": "Finance",
+        "position": "Accountant",
+        "employee_id": "EMP005",
+        "phone": "0905678901",
+        "date_of_birth": "1991-03-14",
+        "annual_leave_days": 12,
+        "remaining_leave_days": 11,
+        "created_at": {
+            "$date": "2024-01-01T00:00:00Z"
+        }
+    }
+]
